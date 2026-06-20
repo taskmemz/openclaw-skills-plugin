@@ -1,0 +1,36 @@
+{
+  "manifest_version": 2,
+  "id": "com.maibot.openclaw-skills",
+  "version": "1.0.0",
+  "name": "OpenClaw 技能桥接",
+  "description": "将复杂任务委托给远程 OpenClaw 智能体执行，支持调试分析、规划审查、头脑风暴、工程回顾等技能。",
+  "author": {
+    "name": "taskmemz",
+    "url": "https://github.com/taskmemz"
+  },
+  "license": "MIT",
+  "urls": {
+    "repository": "https://github.com/taskmemz/openclaw-skills-plugin",
+    "homepage": "https://github.com/taskmemz/openclaw-skills-plugin"
+  },
+  "host_application": {
+    "min_version": "1.0.0",
+    "max_version": "1.99.99"
+  },
+  "sdk": {
+    "min_version": "2.0.0",
+    "max_version": "2.99.99"
+  },
+  "dependencies": [
+    {
+      "type": "python_package",
+      "name": "websockets",
+      "version_spec": ">=12.0"
+    }
+  ],
+  "capabilities": [],
+  "i18n": {
+    "default_locale": "zh-CN",
+    "supported_locales": ["zh-CN"]
+  }
+}

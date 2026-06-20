@@ -1,0 +1,14 @@
+[plugin]
+enabled = false
+config_version = "1.0.0"
+
+[gateway]
+url = "ws://127.0.0.1:18789"
+token = ""
+timeout_seconds = 300
+
+[skills]
+investigate_enabled = true
+ceo_review_enabled = true
+office_hours_enabled = true
+retro_enabled = true
