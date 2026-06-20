@@ -91,6 +91,14 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
 
             await asyncio.wait_for(ws.recv(), timeout=10)
 
+            auth: dict[str, str] = {}
+            if gw.token:
+                auth["token"] = gw.token
+            if gw.password:
+                auth["password"] = gw.password
+            elif gw.token:
+                auth["password"] = gw.token
+
             connect_req = {
                 "type": "req",
                 "id": uuid.uuid4().hex[:12],
@@ -106,7 +114,7 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
                     },
                     "role": "operator",
                     "scopes": ["operator.read", "operator.write"],
-                    "auth": {"token": gw.token, "password": gw.password or gw.token},
+                    "auth": auth,
                 },
             }
             await ws.send(json.dumps(connect_req))
