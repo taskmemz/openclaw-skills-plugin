@@ -127,6 +127,10 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
                     "success": False,
                     "error": f"OpenClaw 网关认证失败: {err_detail}",
                 }
+            hello_ok = connect_resp.get("payload", {})
+            self.ctx.logger.info("Gateway 已连接: role=%s, scopes=%s",
+                                  hello_ok.get("auth", {}).get("role"),
+                                  hello_ok.get("auth", {}).get("scopes"))
 
             async def gw_call(
                 method: str, params: dict, timeout: float = 30
