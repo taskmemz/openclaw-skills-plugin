@@ -96,6 +96,8 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
             auth_secret = gw.password or gw.token
             auth: dict[str, str] = {"token": auth_secret, "password": auth_secret}
 
+            self.ctx.logger.debug("连接 Gateway: %s, client.mode=%s", gw.url, "node")
+
             connect_req = {
                 "type": "req",
                 "id": uuid.uuid4().hex[:12],
