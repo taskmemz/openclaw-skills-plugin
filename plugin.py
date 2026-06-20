@@ -122,9 +122,11 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
                 await asyncio.wait_for(ws.recv(), timeout=10)
             )
             if not connect_resp.get("ok"):
+                err_detail = connect_resp.get("error") or connect_resp.get("payload", {})
+                self.ctx.logger.error("Gateway 认证失败: %s", err_detail)
                 return {
                     "success": False,
-                    "error": "OpenClaw 网关认证失败，请检查 token",
+                    "error": f"OpenClaw 网关认证失败: {err_detail}",
                 }
 
             async def gw_call(
