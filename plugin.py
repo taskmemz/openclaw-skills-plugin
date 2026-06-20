@@ -9,7 +9,7 @@ from maibot_sdk import Field, MaiBotPlugin, PluginConfigBase, Tool
 from maibot_sdk.types import ToolParameterInfo, ToolParamType
 
 
-class OpenClawPluginConfig(PluginConfigBase):
+class GatewayConfig(PluginConfigBase):
     url: str = Field(
         default="ws://127.0.0.1:18789",
         description="OpenClaw Gateway WebSocket 地址",
@@ -25,6 +25,10 @@ class OpenClawPluginConfig(PluginConfigBase):
         description="任务执行超时时间（秒）",
         json_schema_extra={"label": "任务超时"},
     )
+
+
+class OpenClawPluginConfig(PluginConfigBase):
+    gateway: GatewayConfig = Field(default_factory=GatewayConfig)
 
 
 class OpenClawSkillsPlugin(MaiBotPlugin):
@@ -56,10 +60,10 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
         return await self._execute_openclaw_task(task_description)
 
     async def _execute_openclaw_task(self, task: str) -> dict[str, Any]:
-        cfg = self.config
-        if not cfg.url:
+        gw = self.config.gateway
+        if not gw.url:
             return {"success": False, "error": "未配置 OpenClaw 网关地址"}
-        if not cfg.token:
+        if not gw.token:
             return {"success": False, "error": "未配置 OpenClaw 认证令牌"}
 
         ws: Any = None
@@ -67,7 +71,7 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
             import websockets
 
             ws = await asyncio.wait_for(
-                websockets.connect(cfg.url, ping_interval=30), timeout=15
+                websockets.connect(gw.url, ping_interval=30), timeout=15
             )
 
             await asyncio.wait_for(ws.recv(), timeout=10)
@@ -87,7 +91,7 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
                     },
                     "role": "operator",
                     "scopes": ["operator.read", "operator.write"],
-                    "auth": {"token": cfg.token, "password": cfg.token},
+                    "auth": {"token": gw.token, "password": gw.token},
                 },
             }
             await ws.send(json.dumps(connect_req))
@@ -135,7 +139,7 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
             run_id = send["payload"].get("runId", "")
             wait_params: dict[str, Any] = {
                 "sessionKey": session_key,
-                "timeoutMs": cfg.timeout_seconds * 1000,
+                "timeoutMs": gw.timeout_seconds * 1000,
             }
             if run_id:
                 wait_params["runId"] = run_id
@@ -150,7 +154,7 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
 
             while True:
                 raw = await asyncio.wait_for(
-                    ws.recv(), timeout=cfg.timeout_seconds + 10
+                    ws.recv(), timeout=gw.timeout_seconds + 10
                 )
                 msg = json.loads(raw)
                 if msg.get("type") == "res" and msg.get("id") == wait_req["id"]:
