@@ -107,7 +107,7 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
                         "id": "cli",
                         "version": "1.0.0",
                         "platform": "macos",
-                        "mode": "operator",
+                        "mode": "node",
                     },
                     "role": "operator",
                     "scopes": ["operator.read", "operator.write"],
