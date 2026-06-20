@@ -5,4 +5,5 @@ config_version = "1.0.0"
 [gateway]
 url = "ws://127.0.0.1:18789"
 token = ""
+password = ""
 timeout_seconds = 300

@@ -22,8 +22,13 @@ class GatewayConfig(PluginConfigBase):
     )
     token: str = Field(
         default="",
-        description="Gateway 认证令牌",
+        description="Gateway 认证令牌（token 模式用）",
         json_schema_extra={"label": "认证令牌"},
+    )
+    password: str = Field(
+        default="",
+        description="Gateway 密码（password 模式用，留空则使用 token 值）",
+        json_schema_extra={"label": "认证密码"},
     )
     timeout_seconds: int = Field(
         default=300,
@@ -73,8 +78,8 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
         gw = self.config.gateway
         if not gw.url:
             return {"success": False, "error": "未配置 OpenClaw 网关地址"}
-        if not gw.token:
-            return {"success": False, "error": "未配置 OpenClaw 认证令牌"}
+        if not gw.token and not gw.password:
+            return {"success": False, "error": "未配置 OpenClaw 认证令牌或密码"}
 
         ws: Any = None
         try:
@@ -101,7 +106,7 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
                     },
                     "role": "operator",
                     "scopes": ["operator.read", "operator.write"],
-                    "auth": {"token": gw.token, "password": gw.token},
+                    "auth": {"token": gw.token, "password": gw.password or gw.token},
                 },
             }
             await ws.send(json.dumps(connect_req))

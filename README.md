@@ -19,7 +19,8 @@ uv pip install websockets
 | 字段 | 说明 |
 |---|---|
 | 网关地址 | OpenClaw Gateway 地址，默认 `ws://127.0.0.1:18789` |
-| 认证令牌 | OpenClaw Gateway 的密钥 |
+| 认证令牌 | token 模式用的密钥 |
+| 认证密码 | password 模式用的密码，留空则使用 token 的值 |
 | 任务超时 | 单次任务超时秒数，默认 300 |
 
 ## 提供 1 个工具
