@@ -40,6 +40,10 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
     async def on_unload(self) -> None:
         self.ctx.logger.info("OpenClaw 插件已卸载")
 
+    async def on_config_update(self, scope: str, config_data: dict, version: str) -> None:
+        if scope == "self":
+            self.ctx.logger.info("配置已更新: version=%s", version)
+
     @Tool(
         "openclaw_task",
         description="将复杂任务发送给远程 OpenClaw 智能体处理。"
