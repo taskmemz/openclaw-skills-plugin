@@ -104,9 +104,9 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
                     "minProtocol": 4,
                     "maxProtocol": 4,
                     "client": {
-                        "id": "maibot-plugin",
+                        "id": "cli",
                         "version": "1.0.0",
-                        "platform": "node",
+                        "platform": "macos",
                         "mode": "operator",
                     },
                     "role": "operator",
