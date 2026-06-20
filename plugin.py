@@ -9,6 +9,11 @@ from maibot_sdk import Field, MaiBotPlugin, PluginConfigBase, Tool
 from maibot_sdk.types import ToolParameterInfo, ToolParamType
 
 
+class PluginSection(PluginConfigBase):
+    enabled: bool = Field(default=False, description="是否启用")
+    config_version: str = Field(default="1.0.0", description="配置版本号")
+
+
 class GatewayConfig(PluginConfigBase):
     url: str = Field(
         default="ws://127.0.0.1:18789",
@@ -28,6 +33,7 @@ class GatewayConfig(PluginConfigBase):
 
 
 class OpenClawPluginConfig(PluginConfigBase):
+    plugin: PluginSection = Field(default_factory=PluginSection)
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
 
 
