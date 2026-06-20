@@ -2,8 +2,8 @@
   "manifest_version": 2,
   "id": "com.maibot.openclaw-skills",
   "version": "1.0.0",
-  "name": "OpenClaw 技能桥接",
-  "description": "将复杂任务委托给远程 OpenClaw 智能体执行，支持调试分析、规划审查、头脑风暴、工程回顾等技能。",
+  "name": "OpenClaw 任务桥接",
+  "description": "将复杂任务委托给远程 OpenClaw 智能体处理。遇到搞不定的问题时，Maisaka 可以把任务丢给 OpenClaw。",
   "author": {
     "name": "taskmemz",
     "url": "https://github.com/taskmemz"

@@ -1,4 +1,4 @@
-# OpenClaw Skills Plugin
+# OpenClaw 任务桥接
 
 让 MaiBot 把复杂任务丢给远程 OpenClaw 处理。
 
