@@ -91,13 +91,10 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
 
             await asyncio.wait_for(ws.recv(), timeout=10)
 
-            auth: dict[str, str] = {}
-            if gw.token:
-                auth["token"] = gw.token
-            if gw.password:
-                auth["password"] = gw.password
-            elif gw.token:
-                auth["password"] = gw.token
+            if not gw.password and not gw.token:
+                return {"success": False, "error": "未配置 OpenClaw 认证令牌或密码"}
+            auth_secret = gw.password or gw.token
+            auth: dict[str, str] = {"token": auth_secret, "password": auth_secret}
 
             connect_req = {
                 "type": "req",
