@@ -1,10 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
 import json
+import os
+import time
 import uuid
 from typing import Any, ClassVar
 
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    PrivateFormat,
+    NoEncryption,
+    PublicFormat,
+)
 from maibot_sdk import Field, MaiBotPlugin, PluginConfigBase, Tool
 from maibot_sdk.types import ToolParameterInfo, ToolParamType
 
@@ -42,11 +53,40 @@ class OpenClawPluginConfig(PluginConfigBase):
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
 
 
+def _load_or_create_key(plugin_dir: str) -> ed25519.Ed25519PrivateKey:
+    key_path = os.path.join(plugin_dir, ".device_key")
+    if os.path.exists(key_path):
+        with open(key_path, "rb") as f:
+            return ed25519.Ed25519PrivateKey.from_private_bytes(f.read())
+    key = ed25519.Ed25519PrivateKey.generate()
+    os.makedirs(os.path.dirname(key_path) or ".", exist_ok=True)
+    with open(key_path, "wb") as f:
+        f.write(key.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption()))
+    return key
+
+
+def _device_id_from_public(pub: ed25519.Ed25519PublicKey) -> str:
+    raw = pub.public_bytes(Encoding.Raw, PublicFormat.Raw)
+    return hashlib.sha256(raw).hexdigest()[:32]
+
+
 class OpenClawSkillsPlugin(MaiBotPlugin):
     config_model: ClassVar[type[PluginConfigBase] | None] = OpenClawPluginConfig
+    _device_key: ed25519.Ed25519PrivateKey | None = None
 
     async def on_load(self) -> None:
-        self.ctx.logger.info("OpenClaw 插件已加载")
+        plugin_dir = self.get_plugin_config_data().get("__plugin_dir__", "")
+        if not plugin_dir:
+            plugin_dir = "."
+        try:
+            self._device_key = _load_or_create_key(plugin_dir)
+            pub = self._device_key.public_key()
+            self.ctx.logger.info(
+                "OpenClaw 插件已加载, device_id=%s", _device_id_from_public(pub)
+            )
+        except Exception as exc:
+            self.ctx.logger.warning("设备密钥初始化失败: %s", exc)
+            self._device_key = ed25519.Ed25519PrivateKey.generate()
 
     async def on_unload(self) -> None:
         self.ctx.logger.info("OpenClaw 插件已卸载")
@@ -68,9 +108,7 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
             ),
         ],
     )
-    async def tool_task(
-        self, task_description: str, **kwargs: Any
-    ) -> dict[str, Any]:
+    async def tool_task(self, task_description: str, **kwargs: Any) -> dict[str, Any]:
         del kwargs
         return await self._execute_openclaw_task(task_description)
 
@@ -78,9 +116,10 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
         gw = self.config.gateway
         if not gw.url:
             return {"success": False, "error": "未配置 OpenClaw 网关地址"}
-        if not gw.token and not gw.password:
+        if not gw.password and not gw.token:
             return {"success": False, "error": "未配置 OpenClaw 认证令牌或密码"}
 
+        auth_secret = gw.password or gw.token
         ws: Any = None
         try:
             import websockets
@@ -89,14 +128,13 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
                 websockets.connect(gw.url, ping_interval=30), timeout=15
             )
 
-            await asyncio.wait_for(ws.recv(), timeout=10)
+            challenge_raw = await asyncio.wait_for(ws.recv(), timeout=10)
+            challenge = json.loads(challenge_raw)
+            nonce = challenge.get("payload", {}).get("nonce", "")
+            ts = challenge.get("payload", {}).get("ts", int(time.time() * 1000))
 
-            if not gw.password and not gw.token:
-                return {"success": False, "error": "未配置 OpenClaw 认证令牌或密码"}
-            auth_secret = gw.password or gw.token
-            auth: dict[str, str] = {"token": auth_secret, "password": auth_secret}
-
-            self.ctx.logger.debug("连接 Gateway: %s, client.mode=%s", gw.url, "backend")
+            pub = self._device_key.public_key()
+            sig = self._device_key.sign(nonce.encode())
 
             connect_req = {
                 "type": "req",
@@ -106,14 +144,28 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
                     "minProtocol": 4,
                     "maxProtocol": 4,
                     "client": {
-                        "id": "gateway-client",
+                        "id": "cli",
                         "version": "1.0.0",
                         "platform": "macos",
-                        "mode": "backend",
+                        "mode": "operator",
                     },
                     "role": "operator",
                     "scopes": ["operator.read", "operator.write"],
-                    "auth": auth,
+                    "auth": {"token": auth_secret, "password": auth_secret},
+                    "device": {
+                        "id": _device_id_from_public(pub),
+                        "publicKey": base64.b64encode(
+                            pub.public_bytes(Encoding.Raw, PublicFormat.Raw)
+                        ).decode(),
+                        "signature": base64.b64encode(sig).decode(),
+                        "signedAt": ts,
+                        "nonce": nonce,
+                    },
+                    "locale": "zh-CN",
+                    "userAgent": "maibot-plugin/1.0.0",
+                    "caps": [],
+                    "commands": [],
+                    "permissions": {},
                 },
             }
             await ws.send(json.dumps(connect_req))
@@ -123,14 +175,15 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
             if not connect_resp.get("ok"):
                 err_detail = connect_resp.get("error") or connect_resp.get("payload", {})
                 self.ctx.logger.error("Gateway 认证失败: %s", err_detail)
-                return {
-                    "success": False,
-                    "error": f"OpenClaw 网关认证失败: {err_detail}",
-                }
+                return {"success": False, "error": f"OpenClaw 网关认证失败: {err_detail}"}
+
             hello_ok = connect_resp.get("payload", {})
-            self.ctx.logger.info("Gateway 已连接: role=%s, scopes=%s",
-                                  hello_ok.get("auth", {}).get("role"),
-                                  hello_ok.get("auth", {}).get("scopes"))
+            auth_info = hello_ok.get("auth", {})
+            self.ctx.logger.info(
+                "Gateway 已连接: role=%s, scopes=%s",
+                auth_info.get("role"),
+                auth_info.get("scopes"),
+            )
 
             async def gw_call(
                 method: str, params: dict, timeout: float = 30
@@ -158,16 +211,12 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
 
             send = await gw_call(
                 "sessions.send",
-                {
-                    "key": session_key,
-                    "message": task,
-                    "deliver": False,
-                },
+                {"key": session_key, "message": task, "deliver": False},
             )
             if not send.get("ok"):
                 return {"success": False, "error": f"任务发送失败: {send}"}
-
             run_id = send["payload"].get("runId", "")
+
             wait_params: dict[str, Any] = {
                 "sessionKey": session_key,
                 "timeoutMs": gw.timeout_seconds * 1000,
@@ -190,10 +239,7 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
                 msg = json.loads(raw)
                 if msg.get("type") == "res" and msg.get("id") == wait_req["id"]:
                     if not msg.get("ok"):
-                        return {
-                            "success": False,
-                            "error": f"任务执行失败: {msg}",
-                        }
+                        return {"success": False, "error": f"任务执行失败: {msg}"}
                     payload = msg.get("payload", {})
                     response_text = (
                         payload.get("response")
@@ -211,9 +257,7 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
         except asyncio.TimeoutError:
             return {"success": False, "error": "连接 OpenClaw 网关超时"}
         except Exception as exc:
-            self.ctx.logger.error(
-                "OpenClaw 任务执行异常: %s", exc, exc_info=True
-            )
+            self.ctx.logger.error("OpenClaw 任务执行异常: %s", exc, exc_info=True)
             return {"success": False, "error": f"执行异常: {exc}"}
         finally:
             if ws is not None:

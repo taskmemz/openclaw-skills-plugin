@@ -26,6 +26,11 @@
       "type": "python_package",
       "name": "websockets",
       "version_spec": ">=12.0"
+    },
+    {
+      "type": "python_package",
+      "name": "cryptography",
+      "version_spec": ">=41.0"
     }
   ],
   "capabilities": [],
