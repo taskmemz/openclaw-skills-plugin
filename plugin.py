@@ -138,8 +138,11 @@ class OpenClawSkillsPlugin(MaiBotPlugin):
                     "params": params,
                 }
                 await ws.send(json.dumps(req))
-                raw = await asyncio.wait_for(ws.recv(), timeout=timeout)
-                return json.loads(raw)
+                while True:
+                    raw = await asyncio.wait_for(ws.recv(), timeout=timeout)
+                    msg = json.loads(raw)
+                    if msg.get("type") == "res" and msg.get("id") == req["id"]:
+                        return msg
 
             sess = await gw_call(
                 "sessions.create",
